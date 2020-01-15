@@ -19,6 +19,32 @@ struct Matrix_s {
     int * p2_matrix;
 };
 
+int p1_matrix[3][3] = {
+    {1, -3, 7},
+    {0, 2, 5},
+    {5, 5, 3}
+};
+
+int p2_matrix[3][3] = {
+    {32767, 5, 5},
+    {32767, 8, 0},
+    {32767, 1, 7}
+};
+
+/*
+int p1_matrix[3][3] = {
+    {-3, -6, -6},
+    {-1, -3, -7},
+    {-2, 9, 1}
+};
+
+int p2_matrix[3][3] = {
+    {3, 1, 2},
+    {100, 3, -9},
+    {6, 7, -1}
+};*/
+
+/*
 int p1_matrix[6][4] = {
     {6, 8, -8, 6},
     {9, 10, 1, 9},
@@ -28,11 +54,18 @@ int p1_matrix[6][4] = {
     {-5, -6, 4, 1}
 };
 
+int p2_matrix[4][6] = {
+    {-6, -9, 10, -3, -2, 5},
+    {-10, -10, -10, -10, -10, -10},
+    {-10, -10, -10, -10, -10, -10},
+    {-10, -10, -10, -10, -10, -10}
+};*/
+
 Matrix matrix = {
-    .rows = 6,
-    .cols = 4,
+    .rows = 3,
+    .cols = 3,
     .p1_matrix = &p1_matrix[0][0],
-    .p2_matrix = NULL
+    .p2_matrix = &p2_matrix[0][0],
 };
 
 void transpose_and_negate_p1_matrix_into_p2_matrix(Matrix * matrix) {
@@ -59,8 +92,10 @@ void transpose_and_negate_p1_matrix_into_p2_matrix(Matrix * matrix) {
 void print_estimate_payoff_matrix(Matrix * matrix) {
     int num_rows = matrix->rows;
     int num_cols = matrix->cols;
-    int p1_strategy = 0;// rand() % num_rows;
+    int p1_strategy = rand() % num_rows;
+    int p1_initial_strategy = p1_strategy;
     int p2_strategy;
+    int p2_initial_strategy;
     int p1_strategies[MAX_ROWS] = {0};
     int p2_strategies[MAX_COLS] = {0};
     int p1_value_numerator = -32768;
@@ -88,13 +123,17 @@ void print_estimate_payoff_matrix(Matrix * matrix) {
             }
         }
 
+        if (cur_trial == 1) {
+            p2_initial_strategy = p2_strategy;
+        }
+
         if (p2_payoff == 0x7fffffff) {
             abort();
         }
 
         // if ((p2_payoff / cur_trial) > (p1_value.numerator / p1_value.denominator))
         //printf("\np2_payoff: %d, p1_value_denominator: %d, p1_value_numerator: %d, cur_trial: %d\n", p2_payoff, p1_value_denominator, p1_value_numerator, cur_trial);
-        if ((p2_payoff * p1_value_denominator) >= (p1_value_numerator * cur_trial)) {
+        if (cur_trial != 1 && ((p2_payoff * p1_value_denominator) >= (p1_value_numerator * cur_trial))) {
             p1_value_numerator = p2_payoff;
             p1_value_denominator = cur_trial;
             memcpy(p1_best_play_strategy_counts, p1_strategies, num_rows * sizeof(int));
@@ -125,7 +164,7 @@ void print_estimate_payoff_matrix(Matrix * matrix) {
         }
 
         //printf("\np1_payoff: %d, p2_value_denominator: %d, p2_value_numerator: %d, cur_trial: %d\n", p1_payoff, p2_value_denominator, p2_value_numerator, cur_trial);
-        if ((p1_payoff * p2_value_denominator) >= (p2_value_numerator * cur_trial)) {
+        if (cur_trial != 1 && ((p1_payoff * p2_value_denominator) >= (p2_value_numerator * cur_trial))) {
             p2_value_numerator = p1_payoff;
             p2_value_denominator = cur_trial;
             memcpy(p2_best_play_strategy_counts, p2_strategies, num_cols * sizeof(int));
@@ -137,6 +176,23 @@ void print_estimate_payoff_matrix(Matrix * matrix) {
         }
         printf(" % .4f\n", p1_payoff * 1.0 / cur_trial);
     }
+
+    // remove p1's initial strategy since it could be faulty
+    p1_best_play_strategy_counts[p1_initial_strategy]--;
+    p1_value_denominator--;
+
+    p2_best_play_strategy_counts[p2_initial_strategy]--;
+    p2_value_denominator--;
+
+    for (i = 0; i < num_rows; i++) {
+        printf("%d/%d, ", p1_best_play_strategy_counts[i], p1_value_denominator);
+    }
+    printf("\n");
+
+    for (i = 0; i < num_cols; i++) {
+        printf("%d/%d, ", p2_best_play_strategy_counts[i], p2_value_denominator);
+    }
+    printf("\n");
 }
 
 /*
@@ -238,15 +294,17 @@ int estimate_payoff_matrix(Matrix * matrix) {
         }
     }
 
-    printf("chose: %d", i);
+    printf("chose: %d\n", i);
 
     return i;
 }
 
 int main(void) {
     srand(time(NULL));
-    matrix.p2_matrix = malloc(matrix.rows * matrix.cols * sizeof(int));
-    transpose_and_negate_p1_matrix_into_p2_matrix(&matrix);
-    estimate_payoff_matrix(&matrix);
-    free(matrix.p2_matrix);
+    if (matrix.p2_matrix == NULL) {
+        matrix.p2_matrix = malloc(matrix.rows * matrix.cols * sizeof(int));
+        transpose_and_negate_p1_matrix_into_p2_matrix(&matrix);
+    }
+    print_estimate_payoff_matrix(&matrix);
+    //free(matrix.p2_matrix);
 }
